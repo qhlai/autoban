@@ -11,9 +11,10 @@ use axum::{
     // TypedHeader,
 
 };
+use tower_http::{trace::TraceLayer};
 
 use serde::{Deserialize, Serialize};
-use crate::server::handlers::{add,root};
+// use crate::server::handlers::{add,root,ban,list,remove_whitelist,log_record};
 
 use std::{
     collections::HashMap,
@@ -23,26 +24,56 @@ use std::{
     sync::{Arc, Mutex},
     rc::Rc
 };
+use crate::filer_service::service;
+use tower::ServiceBuilder;
+// use::crates::{
+//     filer_service::service,
+//     // server::server::{start_server},
 
+// };
 // #[tokio::main]
-pub async fn start_server() {
+//:Arc<Mutex<crate::Config>>
+pub async fn start_server(config :Arc<Mutex<crate::Config>>, data:Arc<Mutex<service::FilterService>>) {
 
+    // let cfg = data.clone();
     let app = Router::new()
         // `GET /` goes to `root`
-        .route("/api/add", get(add))
-        .route("/api/list", get(root).post(root))
-        .route("/api/remove", get(root))
-        .route("/api/log", get(root));
+        .route("/", get(crate::server::handlers::root))
+
+        .route("/api/add", get(crate::server::handlers::add_whitelist))
+        .route("/api/remove", get(crate::server::handlers::remove_whitelist))     
+        .route("/api/list", get(crate::server::handlers::list_whitelist).post(crate::server::handlers::list_whitelist))  
+
+        .route("/api/ban", get(crate::server::handlers::add_blacklist))
+        .route("/api/unban", get(crate::server::handlers::remove_blacklist))
+        .route("/api/listb", get(crate::server::handlers::list_blacklist).post(crate::server::handlers::list_blacklist))       
+
+        .route("/api/reset", get(crate::server::handlers::reset_whitelist))
+
+        .route("/api/log", get(crate::server::handlers::get_record))
+        
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(Extension(data))
+                .layer(Extension(config.clone()))
+        );
 
         // `POST /users` goes to `create_user`
         // .route("/users", post(
         //     create_user));
         // .layer(axum::AddExtensionLayer::new(ConnectInfo::default()));
-
+    let addr:SocketAddr;
+    {
+        let cfg = &*config.lock().unwrap();
+        addr = SocketAddr::from((cfg.listen_ip, cfg.listen_port));
+    }
+    // let cfg = &*config.lock().unwrap();
     // run our app with hyper
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    // let addr = SocketAddr::from((cfg.listen_ip, cfg.listen_port));
+
     // tracing::debug!("listening on {}", listener.local_addr().unwrap());
-    tracing::debug!("listening on {}", addr);
+    tracing::info!("listening on {}", addr);
     axum::Server::bind(&addr)    
     .serve(app.into_make_service_with_connect_info::<SocketAddr>())
     .await.unwrap();

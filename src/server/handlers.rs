@@ -21,8 +21,9 @@ use std::{
     sync::{Arc, Mutex},
     rc::Rc
 };
+use crate::{filer_service::service, server::check_key};
 
-pub async fn add(
+pub async fn add_whitelist(
     method: axum::http::Method,
     axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
     axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
@@ -30,31 +31,359 @@ pub async fn add(
 
     xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
 ) -> impl IntoResponse {
 
     println!("{}, {:?}, {:?}", method, addr, user_agent);
-    // println!("{}, {:?}, {:?}", method, addr, user_agent.unwrap());
 
-    // println!("{}, {:?}, {:?}, {:?}", method, addr, user_agent, realip);
-    let ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
- 
-    println!("ip:{:?}",ip);
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+    println!("query_ip: {:?}",query_ip);
 
-    // location /api {
-    //     proxy_set_header  X-real-ip $remote_addr;
-    //     proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
-    //     proxy_pass http://127.0.0.1:8080/api;
-    //  }
-
-    // let mut key:String = String::from("value");
     let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], true, String::from("add"), &*config.lock().unwrap()){
+        
+        let mut data = data.0.lock().unwrap();
+        match para.get("ip") {
+            Some(ip)=>{
+                match ip.parse() {
+                    Ok(ip) =>{
+                        // final_ip=ip;
+                        log::info!("client: {query_ip} add whitelisted {ip}");
+                        // let mut data = data.0.lock().unwrap();
+                        data.add_whitelisted_ip(ip);            
+                        return (StatusCode::OK, "ok");
+                    },
+                    Err(err) =>{
+                        log::warn!("err: {err}, param ip is {ip}");
+                        log::info!("client: {query_ip} add whitelisted {query_ip}");
+                        
+                        data.add_whitelisted_ip(query_ip); 
 
-    (StatusCode::OK, key)
+                        return (StatusCode::OK, "ok");
+                    }
+                }
+            },
+            None =>{
+                log::info!("client: {query_ip} add whitelisted {query_ip}");
+                // let mut data = data.0.lock().unwrap();
+                data.add_whitelisted_ip(query_ip); 
+
+                return (StatusCode::OK, "ok");
+            }
+        }
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED");
+    }
+
+}
+
+pub async fn add_blacklist(
+    method: axum::http::Method,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
+    axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
+    user_agent: Result<TypedHeader<axum::headers::UserAgent>,TypedHeaderRejection>,
+
+    xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
+    xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+) -> impl IntoResponse {
+    println!("{}, {:?}, {:?}", method, addr, user_agent);
+
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+
+    let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], true, String::from("ban"), &*config.lock().unwrap()){
+        let mut data = data.0.lock().unwrap();
+
+        match para.get("ip") {
+            Some(ip)=>{
+                match ip.parse() {
+                    Ok(ip) =>{
+                        log::info!("client: {query_ip} add blacklisted {ip}");
+                        data.add_blacklisted_ip(ip);            
+                        return (StatusCode::OK, "ok");
+                    },
+                    Err(err) =>{
+                        log::warn!("err: {err}, param ip is {ip}");
+                        return (StatusCode::BAD_REQUEST, "bad request");
+                    }
+                }
+            },
+            None =>{
+                return (StatusCode::BAD_REQUEST, "bad request");
+            }
+        }
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED");
+    }
+}
+pub async fn list_whitelist(
+    method: axum::http::Method,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
+    axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
+    user_agent: Result<TypedHeader<axum::headers::UserAgent>,TypedHeaderRejection>,
+
+    xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
+    xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+) -> impl IntoResponse {
+    println!("{}, {:?}, {:?}", method, addr, user_agent);
+
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+
+    let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], false, String::from("list_whitelist"), &*config.lock().unwrap()){
+        let mut data = data.0.lock().unwrap();
+
+     
+        // final_ip=ip;
+        log::info!("client: {query_ip} list_whitelist");
+        // data.del_whitelisted_ip(ip);            
+        let mut output=String::new();
+        let records = data.get_whitelist_data();
+        output+=&format!("[whitelist] has  {} ip  gen by: {query_ip}\n",records.len())[..];
+        output+=&format!("ip            packets_out   packets_in    bandwidth_out bandwidth_in  \n")[..];
+
+        for record in records.iter() {
+
+            output+=&format!("{:width$} {:width$} {:width$} {:width$} {:width$}\n",record.ip, record.packets_out, record.packets_in, record.bandwidth_out, record.bandwidth_in,width=10)[..];
+        }
+        
+        return (StatusCode::OK, output.to_string());
+                    
+
+
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".to_string());
+    }
+
+}
+pub async fn remove_whitelist(
+    method: axum::http::Method,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
+    axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
+    user_agent: Result<TypedHeader<axum::headers::UserAgent>,TypedHeaderRejection>,
+
+    xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
+    xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+) -> impl IntoResponse {
+
+    println!("{}, {:?}, {:?}", method, addr, user_agent);
+
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+
+    let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], false, String::from("remove_whitelist"), &*config.lock().unwrap()){
+        let mut data = data.0.lock().unwrap();
+
+        match para.get("ip") {
+            Some(ip)=>{
+                match ip.parse() {
+                    Ok(ip) =>{
+                        // final_ip=ip;
+                        log::info!("client: {query_ip} remove_whitelist {ip}");
+                        data.del_whitelisted_ip(ip);            
+                        return (StatusCode::OK, "ok");
+                    },
+                    Err(err) =>{
+                        log::warn!("err: {err}, param ip is {ip}"); 
+                        return (StatusCode::BAD_REQUEST, "bad request");
+                    }
+                }
+            },
+            None =>{
+                log::info!("client: {query_ip} add whitelisted {query_ip}");
+                return (StatusCode::BAD_REQUEST, "bad request");
+            }
+        }
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED");
+    }
+}
+
+pub async fn remove_blacklist(
+    method: axum::http::Method,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
+    axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
+    user_agent: Result<TypedHeader<axum::headers::UserAgent>,TypedHeaderRejection>,
+
+    xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
+    xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+) -> impl IntoResponse {
+
+    println!("{}, {:?}, {:?}", method, addr, user_agent);
+
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+
+    let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], false, String::from("remove_blacklist"), &*config.lock().unwrap()){
+        let mut data = data.0.lock().unwrap();
+
+        match para.get("ip") {
+            Some(ip)=>{
+                match ip.parse() {
+                    Ok(ip) =>{
+                        // final_ip=ip;
+                        log::info!("client: {query_ip} remove_blacklist {ip}");
+                        data.del_blacklisted_ip(ip);            
+                        return (StatusCode::OK, "ok");
+                    },
+                    Err(err) =>{
+                        log::warn!("err: {err}, param ip is {ip}"); 
+                        return (StatusCode::BAD_REQUEST, "bad request");
+                    }
+                }
+            },
+            None =>{
+                // log::info!("client: {query_ip} add whitelisted {query_ip}");
+                return (StatusCode::BAD_REQUEST, "bad request");
+            }
+        }
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED");
+    }
+}
+
+
+pub async fn list_blacklist(
+    method: axum::http::Method,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
+    axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
+    user_agent: Result<TypedHeader<axum::headers::UserAgent>,TypedHeaderRejection>,
+
+    xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
+    xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+) -> impl IntoResponse {
+    println!("{}, {:?}, {:?}", method, addr, user_agent);
+
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+
+    let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], false, String::from("list_blacklist"), &*config.lock().unwrap()){
+        let mut data = data.0.lock().unwrap();
+
+     
+        // final_ip=ip;
+        log::info!("client: {query_ip} list_blacklist");
+        // data.del_whitelisted_ip(ip);            
+        let mut output=String::new();
+        let records = &data.blacklisted_ips;
+        output+=&format!("[blacklist] has {} ip  gen by: {query_ip}\n",records.len())[..];
+        output+=&format!("ips:\n")[..];
+
+        for record in records.iter() {
+            output+=&format!("{:width$}\n",record.0,width=10)[..];
+        }
+
+        return (StatusCode::OK, output.to_string());
+                    
+
+
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".to_string());
+    }
+
+}
+pub async fn reset_whitelist(
+    method: axum::http::Method,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
+    axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
+    user_agent: Result<TypedHeader<axum::headers::UserAgent>,TypedHeaderRejection>,
+
+    xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
+    xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+) -> impl IntoResponse {
+    println!("{}, {:?}, {:?}", method, addr, user_agent);
+
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+
+    let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], false, String::from("reset_whitelist"), &*config.lock().unwrap()){
+        let mut data = data.0.lock().unwrap();
+
+     
+        // final_ip=ip;
+        log::info!("client: {query_ip} reset_whitelist");
+        // data.del_whitelisted_ip(ip);            
+        let mut output=String::from("ok");
+        // let records = &data.reset_whitelist();
+        data.reset_whitelist();
+        // output+=&format!("found {} ip  gen by: {query_ip}\n",records.len())[..];
+        // output+=&format!("ips:\n")[..];
+
+        // for record in records.iter() {
+        //     output+=&format!("{:width$}\n",record.0,width=10)[..];
+        // }
+
+        return (StatusCode::OK, output.to_string());
+                    
+
+
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".to_string());
+    }
+
 }
 pub async fn root() -> &'static str {
-    "Hello, World!"
+    "SelfHelp iptables Whitelist\n/api/add?key=yourkey\n/api/list?key=yourkey \n/api/remove/ip?key=yourkey\n/api/log?key=yourkey\n/api/record?key=yourkey"
 }
+pub async fn get_record(
+    method: axum::http::Method,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
+    axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
+    user_agent: Result<TypedHeader<axum::headers::UserAgent>,TypedHeaderRejection>,
 
+    xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
+    xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+) -> impl IntoResponse {
+
+    println!("{}, {:?}, {:?}", method, addr, user_agent);
+
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+
+    let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], true, String::from("log_record"), &*config.lock().unwrap()){
+        // log::debug!("")
+        let mut output=String::new();
+        
+        let mut data = data.0.lock().unwrap();
+        output+=&format!("found {} ip  gen by: {query_ip}\n",&data.packets_per_ip.len())[..];
+        for (ip,count) in  &data.packets_per_ip {
+            if data.whitelisted_ips.contains_key(ip){
+                output+=&ip.to_string()[..];
+                output+=" record times: ";
+                output+=&count.clone().to_string()[..];
+                output+="  [Whitelist]\n ";
+
+            }else{
+                output+=&ip.to_string()[..];
+                output+=" record times: ";
+                output+=&count.clone().to_string()[..];
+                output+="  \n ";            
+            }
+            return (StatusCode::UNAUTHORIZED, output);
+        }
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".to_string());
+    }
+
+
+
+    (StatusCode::OK, "ok".to_string())
+}
 fn get_client_ip(
     reverse_proxy: bool,
     addr: std::net::IpAddr,     
@@ -109,7 +438,9 @@ fn get_client_ip(
     ip
 }
 
+pub fn which_ip(ip:String)  {
 
+}
 
 
 #[derive(Debug)]
@@ -174,4 +505,16 @@ impl axum::headers::Header for XRealIp {
 
          values.extend(std::iter::once(value.unwrap()));
      }
+}
+
+
+fn handle_poisoned_error<T>(error:std::sync::PoisonError<T>)
+where
+    T: std::fmt::Display,
+{
+    // 获取内部数据
+    let inner = error.into_inner();
+
+    // 处理内部数据的错误情况
+    log::error!("{}",inner.to_string());
 }

@@ -1,0 +1,16 @@
+key_admin = "admin" # 用于执行管理的key
+key_query = "ewqae"
+listen_ip = "0.0.0.0"
+listen_port = 13000 # http api监听端口
+reverse_proxy = false
+
+[filterlist]
+allow_ports = [80,22]# 白名单端口
+ban_ports = []# 需要保护的端口, 默认会拦截外部对这些端口的请求
+allow_ips = ["223.5.5.5","8.8.8.8"] # 白名单IP,支持cidr形式
+# autoReset: d  # 自动重置已添加的白名单和黑名单, 可以指定周期时常
+ban_ips = ["2.2.2.2"]
+auto_add_threshold = 0
+#rate_trigger= "10/3" # 包速率触发器, 当包速率超过这个值时自动添加白名单，不设置时不会自动添加
+reject = false # 采用reject进行响应，而不是默认的drop
+deny_action = "DROP" # or REJECT # 采用reject进行响应，而不是默认的drop
