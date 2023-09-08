@@ -5,7 +5,7 @@ listen_port = 13000 # http api监听端口
 reverse_proxy = false
 
 [filterlist]
-allow_ports = [80,22]# 白名单端口
+allow_ports = [80,22,62500,62501]# 白名单端口
 ban_ports = []# 需要保护的端口, 默认会拦截外部对这些端口的请求
 allow_ips = ["223.5.5.5","8.8.8.8"] # 白名单IP,支持cidr形式
 # autoReset: d  # 自动重置已添加的白名单和黑名单, 可以指定周期时常

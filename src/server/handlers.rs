@@ -148,13 +148,10 @@ pub async fn list_whitelist(
         output+=&format!("ip            packets_out   packets_in    bandwidth_out bandwidth_in  \n")[..];
 
         for record in records.iter() {
-
             output+=&format!("{:width$} {:width$} {:width$} {:width$} {:width$}\n",record.ip, record.packets_out, record.packets_in, record.bandwidth_out, record.bandwidth_in,width=10)[..];
         }
-        
+        log::debug!("{output}");
         return (StatusCode::OK, output.to_string());
-                    
-
 
     }else {
         return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".to_string());
@@ -283,7 +280,7 @@ pub async fn list_blacklist(
         for record in records.iter() {
             output+=&format!("{:width$}\n",record.0,width=10)[..];
         }
-
+        log::debug!("{output}");
         return (StatusCode::OK, output.to_string());
                     
 
@@ -311,29 +308,41 @@ pub async fn reset_whitelist(
     let key  =para.get("key").unwrap_or(&"".to_string()).clone();
     if check_key(&key[..], false, String::from("reset_whitelist"), &*config.lock().unwrap()){
         let mut data = data.0.lock().unwrap();
-
-     
-        // final_ip=ip;
-        log::info!("client: {query_ip} reset_whitelist");
-        // data.del_whitelisted_ip(ip);            
+        log::info!("client: {query_ip} reset_whitelist");         
         let mut output=String::from("ok");
-        // let records = &data.reset_whitelist();
         data.reset_whitelist();
-        // output+=&format!("found {} ip  gen by: {query_ip}\n",records.len())[..];
-        // output+=&format!("ips:\n")[..];
-
-        // for record in records.iter() {
-        //     output+=&format!("{:width$}\n",record.0,width=10)[..];
-        // }
-
         return (StatusCode::OK, output.to_string());
-                    
-
-
     }else {
         return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".to_string());
     }
+}
+pub async fn reset_all(
+    method: axum::http::Method,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,   
+    axum::extract::Query(para): axum::extract::Query<HashMap<String, String>>,    
+    user_agent: Result<TypedHeader<axum::headers::UserAgent>,TypedHeaderRejection>,
 
+    xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
+    xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
+    data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+) -> impl IntoResponse {
+    println!("{}, {:?}, {:?}", method, addr, user_agent);
+
+    let query_ip =get_client_ip(false,addr.ip(),xrealip, xforwardfor);
+
+    let key  =para.get("key").unwrap_or(&"".to_string()).clone();
+    if check_key(&key[..], false, String::from("reset_whitelist"), &*config.lock().unwrap()){
+        let mut data = data.0.lock().unwrap();
+        log::info!("client: {query_ip} reset_whitelist");
+        data.init();
+        data.load_config(config.lock().unwrap().clone());
+        data.reset_table();
+
+        return (StatusCode::OK, "ok".to_string());
+    }else {
+        return (StatusCode::UNAUTHORIZED, "UNAUTHORIZED".to_string());
+    }
 }
 pub async fn root() -> &'static str {
     "SelfHelp iptables Whitelist\n/api/add?key=yourkey\n/api/list?key=yourkey \n/api/remove/ip?key=yourkey\n/api/log?key=yourkey\n/api/record?key=yourkey"

@@ -46,9 +46,15 @@ pub async fn start_server(config :Arc<Mutex<crate::Config>>, data:Arc<Mutex<serv
 
         .route("/api/ban", get(crate::server::handlers::add_blacklist))
         .route("/api/unban", get(crate::server::handlers::remove_blacklist))
-        .route("/api/listb", get(crate::server::handlers::list_blacklist).post(crate::server::handlers::list_blacklist))       
+        .route("/api/uban", get(crate::server::handlers::remove_blacklist))
 
-        .route("/api/reset", get(crate::server::handlers::reset_whitelist))
+        .route("/api/listb", get(crate::server::handlers::list_blacklist).post(crate::server::handlers::list_blacklist))       
+        .route("/api/listblacklist", get(crate::server::handlers::list_blacklist).post(crate::server::handlers::list_blacklist)) 
+
+        .route("/api/resetw", get(crate::server::handlers::reset_whitelist))
+        .route("/api/resetwhitelist", get(crate::server::handlers::reset_whitelist))
+
+        .route("/api/reset", get(crate::server::handlers::reset_all))
 
         .route("/api/log", get(crate::server::handlers::get_record))
         

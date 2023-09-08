@@ -255,9 +255,9 @@ impl FilterService {
         match ip {
             IpAddr::V4(ip)=> {
                 
-                iferror(self.tables_v4.append_unique("filter", BANDWIDTH_IN_CHAIN, &(" -s ".to_string()+&ip.to_string()[..]+" -j RETURN")[..]));
-                iferror(self.tables_v4.append_unique("filter", BANDWIDTH_OUT_CHAIN, &(" -d ".to_string()+&ip.to_string()[..]+" -j RETURN")[..]));
-                iferror(self.tables_v4.append_unique("filter", PROTECT_CHAIN, &(" -s ".to_string()+&ip.to_string()[..]+" -j ACCEPT")[..]));  
+                iferror(self.tables_v4.insert_unique("filter", BANDWIDTH_IN_CHAIN, &(" -s ".to_string()+&ip.to_string()[..]+" -j RETURN")[..], 1));
+                iferror(self.tables_v4.insert_unique("filter", BANDWIDTH_OUT_CHAIN, &(" -d ".to_string()+&ip.to_string()[..]+" -j RETURN")[..], 1));
+                iferror(self.tables_v4.insert_unique("filter", PROTECT_CHAIN, &(" -s ".to_string()+&ip.to_string()[..]+" -j ACCEPT")[..], 1));  
             },
             IpAddr::V6(ip)=> {
                 // TODO:
@@ -286,6 +286,15 @@ impl FilterService {
     }
     pub fn reset_whitelist(&mut self){
         self.whitelisted_ips=HashMap::new();
+        self.packets_per_ip=HashMap::new();
+        self.clear_tables();
+        self.start();
+    }
+
+    pub fn reset_table(&mut self){
+        // self.whitelisted_ips=HashMap::new();
+        // self.blacklisted_ips=HashMap::new();
+        
         self.packets_per_ip=HashMap::new();
         self.clear_tables();
         self.start();
@@ -385,8 +394,8 @@ impl FilterService {
                     for index in 0..lines_in.len() {
                         let in_field: Vec<&str> = lines_in[index].split_whitespace().collect();
                         let out_field: Vec<&str> = lines_out[index].split_whitespace().collect();
-                        log::info!("{:?}",in_field);
-                        log::info!("{:?}",out_field);
+                        // log::info!("{:?}",in_field);
+                        // log::info!("{:?}",out_field);
 
                         let wr = WhitelistRecord {
                             ip:*ip,
