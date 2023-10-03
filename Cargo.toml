@@ -30,7 +30,7 @@ serde_json = "1.0.68"
 tokio = { version = "1.0", features = ["full"] }
 iptables = "0.5.0"
 nftables = "0.2.4"
-cidr-utils = "0.5.10"
+#cidr-utils =  { version = "0.5.10", features = ["serde"] }
 local-ip-address = "0.5.4"
 ctrlc = "3.4.1"
 tower = "0.4.13"
@@ -40,6 +40,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 log = "0.4"
 env_logger = "0.10.0"
+
+[dependencies.cidr-utils]
+version = "*"
+features = ["serde"]
 
 
 #[dev-dependencies]

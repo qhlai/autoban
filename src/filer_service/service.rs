@@ -14,9 +14,10 @@ use local_ip_address;
 use crate::filer_service::{*};
 use crate::utils::iferror::{iferror};
 use ctrlc;
+use cidr_utils::cidr::IpCidr;
 
 pub struct WhitelistRecord  {
-	pub ip           :std::net::IpAddr,
+	pub ip           :cidr_utils::cidr::IpCidr,
 	pub packets_out   :u16,
 	pub packets_in    :u16,
 	pub bandwidth_out :u16,
@@ -31,11 +32,11 @@ pub struct FilterService{
 	pub tables_v4:         iptables::IPTables,
     pub tables_v6:         iptables::IPTables,
 	// IP6Tables        *iptables.IPTables
-	pub whitelisted_ips:   HashMap<std::net::IpAddr, empty_struct>,
-	pub blacklisted_ips:   HashMap<std::net::IpAddr, empty_struct>,
+	pub whitelisted_ips:   HashMap<IpCidr, empty_struct>,
+	pub blacklisted_ips:   HashMap<IpCidr, empty_struct>,
 	pub whitelisted_ports: HashMap<u16, empty_struct>,
 	pub blacklisted_ports: HashMap<u16, empty_struct>,
-	pub packets_per_ip:    HashMap<std::net::IpAddr, u32>,
+	pub packets_per_ip:    HashMap<cidr_utils::cidr::IpCidr, u32>,
 	pub auto_add_threshold: u16,
 	pub deny_action:       String,
     pub rate_trigger:String,
@@ -138,6 +139,11 @@ impl FilterService {
         for (port,_) in self.whitelisted_ports.iter(){
             iferror(self.tables_v4.append_unique("filter", PROTECT_CHAIN, &("-p tcp --dport ".to_string()+&port.to_string()[..]+" -j ACCEPT")[..]));
             iferror(self.tables_v4.append_unique("filter", PROTECT_CHAIN, &("-p udp --dport ".to_string()+&port.to_string()[..]+" -j ACCEPT")[..]));
+
+
+            iferror(self.tables_v4.append_unique("filter", PROTECT_CHAIN, &("-p tcp --sport ".to_string()+&port.to_string()[..]+" -j ACCEPT")[..]));
+            iferror(self.tables_v4.append_unique("filter", PROTECT_CHAIN, &("-p udp --sport ".to_string()+&port.to_string()[..]+" -j ACCEPT")[..]));
+
             // iferror(self.tables_v4.append_unique("filter", PROTECT_CHAIN, &("-p all --dport ".to_string()+&port.to_string()[..]+" -j ACCEPT")[..]));
         }
 
@@ -190,9 +196,12 @@ impl FilterService {
         // self.
 
         for ip in config.filterlist.allow_ips.into_iter(){
+            let ip =cidr_utils::cidr::IpCidr::from_str(&ip[..]).unwrap();
+
             self.whitelisted_ips.insert(ip, empty_struct {  });
         }
         for ip in config.filterlist.ban_ips.into_iter(){
+            let ip =cidr_utils::cidr::IpCidr::from_str(&ip[..]).unwrap();
             self.blacklisted_ips.insert(ip, empty_struct {  });
         }
         for port in config.filterlist.allow_ports.into_iter(){
@@ -250,16 +259,16 @@ impl FilterService {
         // self.clear_tables();
         // std::process::exit(0);
     }
-    pub fn add_whitelisted_ip(&mut self,ip:std::net::IpAddr){
+    pub fn add_whitelisted_ip(&mut self,ip:cidr_utils::cidr::IpCidr){
         self.whitelisted_ips.insert(ip, empty_struct{});
         match ip {
-            IpAddr::V4(ip)=> {
+            cidr_utils::cidr::IpCidr::V4(ip)=> {
                 
                 iferror(self.tables_v4.insert_unique("filter", BANDWIDTH_IN_CHAIN, &(" -s ".to_string()+&ip.to_string()[..]+" -j RETURN")[..], 1));
                 iferror(self.tables_v4.insert_unique("filter", BANDWIDTH_OUT_CHAIN, &(" -d ".to_string()+&ip.to_string()[..]+" -j RETURN")[..], 1));
                 iferror(self.tables_v4.insert_unique("filter", PROTECT_CHAIN, &(" -s ".to_string()+&ip.to_string()[..]+" -j ACCEPT")[..], 1));  
             },
-            IpAddr::V6(ip)=> {
+            cidr_utils::cidr::IpCidr::V6(ip)=> {
                 // TODO:
                 log::debug!("{ip}");
                 // println!("{ip}");
@@ -275,7 +284,7 @@ impl FilterService {
         // // }
 
     }
-    pub fn del_whitelisted_ip(&mut self,ip:std::net::IpAddr){
+    pub fn del_whitelisted_ip(&mut self,ip:cidr_utils::cidr::IpCidr){
         self.whitelisted_ips.remove(&ip);
         self.packets_per_ip.remove(&ip);
 
@@ -299,14 +308,14 @@ impl FilterService {
         self.clear_tables();
         self.start();
     }
-    pub fn add_blacklisted_ip(&mut self,ip:std::net::IpAddr){
+    pub fn add_blacklisted_ip(&mut self,ip:cidr_utils::cidr::IpCidr){
     
         self.blacklisted_ips.insert(ip, empty_struct{});
         match ip {
-            IpAddr::V4(ip)=> {
+            cidr_utils::cidr::IpCidr::V4(ip)=> {
                 iferror(self.tables_v4.append_unique("filter", BLACKLIST_CHAIN, &(" -s ".to_string()+&ip.to_string()[..]+" -j "+ &self.deny_action)[..]));  
             },
-            IpAddr::V6(ip)=> {
+            cidr_utils::cidr::IpCidr::V6(ip)=> {
                 // TODO:
                 log::debug!("{ip}");
                 // self.tables_v4.append_unique("filter", PROTECT_CHAIN, &format!("{}{}","-s",PROTECT_CHAIN)[..]));
@@ -314,7 +323,7 @@ impl FilterService {
         }
     
     }
-    pub fn del_blacklisted_ip(&mut self,ip:std::net::IpAddr){
+    pub fn del_blacklisted_ip(&mut self,ip:cidr_utils::cidr::IpCidr){
         self.blacklisted_ips.remove(&ip);
         self.packets_per_ip.remove(&ip);
 
@@ -366,8 +375,12 @@ impl FilterService {
             for (ip,_) in self.whitelisted_ips.iter(){
                 let lines_in: Vec<&str>;
                 let lines_out: Vec<&str>;
-                match ip{
+                // log::debug!("{}",ip.to_string());
+                let ip_addr = ip.clone().first_as_ip_addr();
+                match ip_addr{
                     IpAddr::V4(ip)=>{
+                        // let ip = ip.to_string().split("/").collect::<Vec<&str>>()[0].to_string();
+                        // let ip = ip.clone().first_as_ip_addr();
                         lines_in = stdout_input.lines()
                 .filter(|&line| line.contains(&ip.to_string()[..]))
                 .collect();
@@ -376,6 +389,7 @@ impl FilterService {
                 .collect();
                     },
                     IpAddr::V6(ip)=>{
+                        // let ip = ip.to_string().split("/").collect::<Vec<&str>>()[0].to_string();
                         lines_in = stdout_input_v6.lines()
                 .filter(|&line| line.contains(&ip.to_string()[..]))
                 .collect();

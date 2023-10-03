@@ -398,23 +398,23 @@ fn get_client_ip(
     addr: std::net::IpAddr,     
     xrealip: Result<TypedHeader<XRealIp>,TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>
-) -> std::net::IpAddr{
-    let mut ip:std::net::IpAddr;
+) -> cidr_utils::cidr::IpCidr{
+    let mut ip:cidr_utils::cidr::IpCidr;
     // let reverse =false;
     if !reverse_proxy {
-        ip=addr;
+        ip=cidr_utils::cidr::IpCidr::from_str(&addr.to_string()[..]).unwrap();
     }
     else{
         let mut ok_reverse = false;
         
         match xrealip {
             Ok(xrealip) => {
-                ip=xrealip.0.0;
+                ip=cidr_utils::cidr::IpCidr::from_str(&xrealip.0.0.to_string()[..]).unwrap();
                 ok_reverse=true;
                 println!("xforwardfor: {}",  ip)
             },
             Err(err) =>  {
-                ip = std::net::IpAddr::from([127, 0, 0, 1]);
+                ip = cidr_utils::cidr::IpCidr::from_str("127.0.0.1").unwrap();
                 println!("{:?}",err.to_string())
             },
         }
@@ -436,7 +436,7 @@ fn get_client_ip(
                     println!("xforwardfor: {}",  xforwardfor);                    
                 },
                 Err(err) =>  {
-                    ip = std::net::IpAddr::from([127, 0, 0, 1]);
+                    ip = cidr_utils::cidr::IpCidr::from_str("127.0.0.1").unwrap();
                     println!("{:?}",err.to_string())
                 },
             }

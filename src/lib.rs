@@ -3,7 +3,7 @@ mod func;
 pub mod server;
 pub mod filer_service;
 pub mod utils;
-
+use cidr_utils::cidr::IpCidr;
 use serde::{Deserialize, Serialize};
 
 use std::io::prelude::*;
@@ -54,8 +54,8 @@ impl Default for Config {
 pub struct FilterList {
     pub allow_ports: Vec<u16>,
     pub ban_ports: Vec<u16>,
-    pub allow_ips: Vec<std::net::IpAddr>,
-    pub ban_ips: Vec<std::net::IpAddr>,
+    pub allow_ips: Vec<String>,
+    pub ban_ips: Vec<String>,
     pub auto_add_threshold: u16,
     pub reject: bool,
     // pub deny_action:String,
