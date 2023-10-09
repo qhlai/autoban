@@ -1,8 +1,8 @@
-mod database;
 mod func;
 pub mod server;
 pub mod filer_service;
 pub mod utils;
+pub mod database;
 use cidr_utils::cidr::IpCidr;
 use serde::{Deserialize, Serialize};
 

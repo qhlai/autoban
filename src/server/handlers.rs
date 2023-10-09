@@ -129,6 +129,7 @@ pub async fn list_whitelist(
     xforwardfor: Result<TypedHeader<XForwardedFor>,TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
     config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    database: axum::extract::Extension<Arc<Mutex<crate::database::query::Database>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 
@@ -137,8 +138,8 @@ pub async fn list_whitelist(
     let key  =para.get("key").unwrap_or(&"".to_string()).clone();
     if check_key(&key[..], false, String::from("list_whitelist"), &*config.lock().unwrap()){
         let mut data = data.0.lock().unwrap();
-
-     
+        let mut database = database.0.lock().unwrap();
+        
         // final_ip=ip;
         log::info!("client: {query_ip} list_whitelist");
         // data.del_whitelisted_ip(ip);            
@@ -148,7 +149,8 @@ pub async fn list_whitelist(
         output+=&format!("ip            packets_out   packets_in    bandwidth_out bandwidth_in  \n")[..];
 
         for record in records.iter() {
-            output+=&format!("{:width$} {:width$} {:width$} {:width$} {:width$}\n",record.ip, record.packets_out, record.packets_in, record.bandwidth_out, record.bandwidth_in,width=10)[..];
+            let ip_location = database.query_ip(&record.ip.first_as_ip_addr()).unwrap();
+            output+=&format!("{:width$} {:width$} {:width$} {:width$} {:width$} {:width$}\n",record.ip, record.packets_out, record.packets_in, record.bandwidth_out, record.bandwidth_in,ip_location,width=10)[..];
         }
         log::debug!("{output}");
         return (StatusCode::OK, output.to_string());

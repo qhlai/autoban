@@ -96,7 +96,7 @@
 			"cfenv": "cpp"
 		},
 		"rust-analyzer.linkedProjects": [
-			"./certs/crates/verify_tools/Cargo.toml"
+			// "./certs/crates/verify_tools/Cargo.toml"
 		]
 	}
 }

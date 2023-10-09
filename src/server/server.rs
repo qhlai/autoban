@@ -25,6 +25,7 @@ use std::{
     rc::Rc
 };
 use crate::filer_service::service;
+use crate::database::query;
 use tower::ServiceBuilder;
 // use::crates::{
 //     filer_service::service,
@@ -33,7 +34,7 @@ use tower::ServiceBuilder;
 // };
 // #[tokio::main]
 //:Arc<Mutex<crate::Config>>
-pub async fn start_server(config :Arc<Mutex<crate::Config>>, data:Arc<Mutex<service::FilterService>>) {
+pub async fn start_server(config :Arc<Mutex<crate::Config>>, data:Arc<Mutex<service::FilterService>>,database:Arc<Mutex<query::Database>>) {
 
     // let cfg = data.clone();
     let app = Router::new()
@@ -63,6 +64,7 @@ pub async fn start_server(config :Arc<Mutex<crate::Config>>, data:Arc<Mutex<serv
                 .layer(TraceLayer::new_for_http())
                 .layer(Extension(data))
                 .layer(Extension(config.clone()))
+                .layer(Extension(database.clone()))
         );
 
         // `POST /users` goes to `create_user`

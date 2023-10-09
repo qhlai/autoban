@@ -27,6 +27,7 @@ use std::{
 
 use::autoban::{
     filer_service::service,
+    database,
     server::server::{start_server},
     Config,
 };
@@ -57,21 +58,15 @@ async fn main() {
         // 返回一个默认值
         std::process::exit(1);
     });
+    let config = Arc::new(Mutex::new(config));
 
     log::debug!("{:?}",config);
-
-
-    // pause();    
+    let database = Arc::new(Mutex::new(database::query::Database::new()));
 
     // let running = Arc::new(AtomicBool::new(true));    
     let filter_config = Arc::new(Mutex::new(service::FilterService::new()));
-    let config = Arc::new(Mutex::new(config));
+    
 
-    // let r = running.clone();    
-    // let ipt = iptables::new(false).unwrap();
-    // ipt.new_chain("nat", "NEWCHAINNAME");
-    // build our application with a route
-    // let config_clone = config.lock().unwrap();
     let filter_config = filter_config.clone();
     filter_config.lock().unwrap().load_config(config.lock().unwrap().clone());
     filter_config.lock().unwrap().start();
@@ -80,7 +75,7 @@ async fn main() {
     let filter_config_clone = filter_config.clone();
     // a.lock().unwrap().clear_tables();
     handles.push(  tokio::spawn(async move {
-        start_server(config,filter_config_clone).await;
+        start_server(config,filter_config_clone, database).await;
     }));
     let filter_config_clone = filter_config.clone();
 
