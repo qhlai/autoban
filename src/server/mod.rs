@@ -6,7 +6,12 @@ pub mod server;
 //     proxy_pass http://127.0.0.1:8080/api;
 //  }
 
-pub fn check_key(key: &str, privilege: bool, api_name: String, config: &crate::config::Config) -> bool {
+pub fn check_key(
+    key: &str,
+    privilege: bool,
+    api_name: String,
+    config: &crate::config::Config,
+) -> bool {
     let result: bool;
     if key.len() > 0 {
         if privilege {

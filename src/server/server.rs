@@ -1,13 +1,13 @@
 use axum::{
     extract::{
         rejection::{QueryRejection, TypedHeaderRejection},
-        ConnectInfo, Extension, State,
+        ConnectInfo, Extension, Path, State,
     },
     headers,
     http::StatusCode,
+    http::{header::HOST, HeaderMap},
     http::{Method, Uri},
     response::IntoResponse,
-    http::{header::HOST, HeaderMap},
     // TypedHeader,
     // response::IntoResponse,
     routing::{get, post},
@@ -20,8 +20,8 @@ use tower_http::trace::TraceLayer;
 use serde::{Deserialize, Serialize};
 // use crate::server::handlers::{add,root,ban,list,remove_whitelist,log_record};
 
-use crate::{database::query, config};
 use crate::filer_service::service;
+use crate::{config, database::query};
 use std::{
     collections::HashMap,
     error::Error,
@@ -30,8 +30,8 @@ use std::{
     rc::Rc,
     sync::{Arc, Mutex},
 };
-use tower::ServiceBuilder;
 use tokio::signal;
+use tower::ServiceBuilder;
 // use::crates::{
 //     filer_service::service,
 //     // server::server::{start_server},
@@ -40,10 +40,11 @@ use tokio::signal;
 // #[tokio::main]
 //:Arc<Mutex<crate::config::Config>>
 
-
 pub async fn shutdown_signal(data: Arc<Mutex<service::FilterService>>) {
     let ctrl_c = async {
-        signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
     };
 
     #[cfg(unix)]
@@ -86,35 +87,8 @@ pub async fn start_server(
         // `GET /` goes to `root`
         // .route("/", get(crate::server::handlers::root))
         .route("/", get(crate::assets::index_handler))
-        .route("/api/add", get(crate::server::handlers::add_whitelist))
-        .route(
-            "/api/remove",
-            get(crate::server::handlers::remove_whitelist),
-        )
-        .route(
-            "/api/list",
-            get(crate::server::handlers::list_whitelist)
-                .post(crate::server::handlers::list_whitelist),
-        )
-        .route("/api/ban", get(crate::server::handlers::add_blacklist))
-        .route("/api/unban", get(crate::server::handlers::remove_blacklist))
-        .route(
-            "/api/listb",
-            get(crate::server::handlers::list_blacklist)
-                .post(crate::server::handlers::list_blacklist),
-        )
-        .route(
-            "/api/listblacklist",
-            get(crate::server::handlers::list_blacklist)
-                .post(crate::server::handlers::list_blacklist),
-        )
-        .route("/api/resetw", get(crate::server::handlers::reset_whitelist))
-        .route(
-            "/api/resetwhitelist",
-            get(crate::server::handlers::reset_whitelist),
-        )
-        .route("/api/reset", get(crate::server::handlers::reset_all))
-        .route("/api/log", get(crate::server::handlers::get_record))
+        .route("/api/:path", get(crate::server::handlers::api_func))
+        .route("/api/json/:path", get(crate::server::handlers::api_func_json))
         .fallback(fallback)
         .layer(
             ServiceBuilder::new()

@@ -1,7 +1,7 @@
+pub mod assets;
+pub mod config;
 pub mod database;
 pub mod filer_service;
-pub mod config;
-pub mod assets;
 mod func;
 pub mod server;
 pub mod utils;
@@ -20,5 +20,3 @@ pub fn pause() {
     // Read a single byte and discard
     let _ = stdin.read(&mut [0u8]).unwrap();
 }
-
-

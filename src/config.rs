@@ -1,4 +1,3 @@
-
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -6,7 +5,6 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use uuid::Uuid;
-
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(default)]
@@ -85,7 +83,6 @@ pub fn from_str(content: &str) -> Option<Config> {
     Some(o)
 }
 
-
 pub fn from_env() -> Option<Config> {
     from_str(
         env::var("SRV_CONF")
@@ -106,7 +103,6 @@ pub fn test_from_file(cfg: &str) -> Result<Config> {
         .unwrap()
         .map_err(anyhow::Error::new)
 }
-
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(default)]

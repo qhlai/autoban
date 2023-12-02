@@ -1,5 +1,17 @@
 <!doctype html>
 <html lang="en">
+    <style>
+        .table-like-span {
+            display: flex;
+            flex-wrap: wrap;
+        }
+    
+        .table-like-span > span {
+            /* flex: 1 0 33.33%; 每列占据 33.33% 的宽度 */
+            padding: 5px;
+            border: 1px solid black;
+        }
+    </style>
 
 <head>
     <meta charset="utf-8" />
@@ -22,17 +34,18 @@
     <!-- <div id="root"></div> -->
     <input type="text" id="key">
     <input type="text" id="ip">
-    <button type="button" onclick="fetchData('/api/add')">add</button>
-    <button type="button" onclick="fetchData('/api/remove')">remove</button>
-    <button type="button" onclick="fetchData('/api/list')">list</button>
-    <button type="button" onclick="fetchData('/api/ban')">ban</button>
-    <button type="button" onclick="fetchData('/api/unban')">unban</button>
-    <button type="button" onclick="fetchData('/api/listb')">listb</button>
-    <button type="button" onclick="fetchData('/api/listw')">listw</button>
-    <button type="button" onclick="fetchData('/api/reset')">reset</button>
-    <button type="button" onclick="fetchData('/api/log')">log</button>
+    <br />
+
+    <button type="button" onclick="fetchData_plain('/api/add',true)">add</button>
+    <button type="button" onclick="fetchData_plain('/api/ban',true)">ban</button>
+    <button type="button" onclick="fetchData_plain('/api/del',true)">del</button>
+    <button type="button" onclick="fetchData_json('/api/json/listb',false)">listb</button>
+    <button type="button" onclick="fetchData_json('/api/json/listw',false)">listw</button>
+    <button type="button" onclick="fetchData_plain('/api/reset',false)">reset</button>
+    <button type="button" onclick="fetchData_plain('/api/log',false)">log</button>
 
     <div id="responseContainer"></div>
+    
 </body>
 
 
@@ -60,28 +73,129 @@
       // 发送请求
       xhr.send();
     }
-    function fetchData(url) {
+    function fetchData_json(url, with_ip) {
+      var xhr = new XMLHttpRequest();
+
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+          if (xhr.status === 200) {
+            var responseContainer = document.getElementById('responseContainer');
+            responseContainer.textContent = "";
+
+            var data = JSON.parse(xhr.responseText);
+            if (data.hasOwnProperty("title")) {
+                var categoryTitle = document.createElement('h3');
+                categoryTitle.classList.add("title");
+                categoryTitle.textContent = data["title"];
+                responseContainer.appendChild(categoryTitle);
+            }
+            if (data.hasOwnProperty("subtitle")) {
+                var rowElement = document.createElement('div');
+                // rowElement.classList.add('data-row');    
+                rowElement.classList.add('table-like-span');            
+                data["subtitle"].forEach(function(item) {
+                    var dataElement = document.createElement('span');
+                    dataElement.textContent = item;
+                    rowElement.appendChild(dataElement);
+                    responseContainer.appendChild(rowElement);
+                });
+            }
+
+            if (data.hasOwnProperty("data")) {
+                for (var category in data["data"])  {
+                    var rowElement = document.createElement('div');
+                    // rowElement.classList.add('data-row');    
+                    rowElement.classList.add('table-like-span');            
+                    data["data"][category].forEach(function(item) {
+                        var dataElement = document.createElement('span');
+                        dataElement.textContent = item;
+                        rowElement.appendChild(dataElement);
+                        responseContainer.appendChild(rowElement);
+                    });
+                }
+            }
+            col_length_re();
+
+          } else {
+            console.error('请求发生错误:', xhr.status);
+          }
+        }
+      };
+        var key = document.getElementById("key").value;
+        var ip = document.getElementById("ip").value;
+        if (with_ip){
+            xhr.open('GET', url+"?key="+key+"&ip="+ip); // 替换为你的后端 URL
+        }else{
+            xhr.open('GET', url+"?key="+key); // 替换为你的后端 URL
+        }
+        
+        xhr.send();
+    }
+
+    function fetchData_plain(url, with_ip) {
         var xhr = new XMLHttpRequest();
 
         xhr.onreadystatechange = function() {
         if (xhr.readyState === XMLHttpRequest.DONE) {
             if (xhr.status === 200) {
-            var responseContainer = document.getElementById('responseContainer');
-            responseContainer.textContent = xhr.responseText;
+                var responseContainer = document.getElementById('responseContainer');
+                responseContainer.textContent = "";
+                // responseContainer.textContent = xhr.responseText;
+                var data = xhr.responseText;
+                var lines = data.split('\n');
+                for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                var lineElement = document.createElement('p');
+                lineElement.textContent = line;
+                responseContainer.appendChild(lineElement);
+                }
             } else {
-            console.error('请求发生错误:', xhr.status);
+                console.error('请求发生错误:', xhr.status);
+                var responseContainer = document.getElementById('responseContainer');
+                responseContainer.textContent = xhr.responseText;
+
             }
         }
         };
-        var inputElement = document.getElementById("key");
-        var key = inputElement.value;
-        xhr.open('GET', url+"?key="+key); // 替换为你的后端 URL
+        var key = document.getElementById("key").value;
+        var ip = document.getElementById("ip").value;
+        if (with_ip){
+            xhr.open('GET', url+"?key="+key+"&ip="+ip); // 替换为你的后端 URL
+        }else{
+            xhr.open('GET', url+"?key="+key); // 替换为你的后端 URL
+        }
+        
         xhr.send();
     }
 
     function redirectToURL(url) {
       window.location.href = url;  // 替换为你想要跳转的 URL
     }
+</script>
+
+<script>
+function col_length_re() {
+    // 获取表格容器和所有的列元素
+    var tableContainer = document.getElementById('responseContainer');
+    var rows = Array.from(tableContainer.children);
+    var columns = Array.from(tableContainer.getElementsByTagName('span'));
+    // console.log(columns);
+    // 计算每列的最大宽度
+    var columnWidths = columns.reduce(function (widths, column) {
+        var columnIndex = Array.from(column.parentNode.children).indexOf(column);
+        var columnWidth = Math.ceil(column.getBoundingClientRect().width);
+        widths[columnIndex] = Math.max(widths[columnIndex] || 0, columnWidth);
+        return widths;
+    }, []);
+
+    // 设置每列的宽度
+    rows.forEach(function (row) {
+        var columns = Array.from(row.children);
+        columns.forEach(function (column, columnIndex) {
+            column.style.width = columnWidths[columnIndex] + 'px';
+        });
+    })
+}
 </script>
 
 </html>

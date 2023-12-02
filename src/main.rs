@@ -6,10 +6,10 @@ use std::{
     error::Error,
     net::SocketAddr,
     ops::Deref,
+    process,
     rc::Rc,
     sync::atomic::{AtomicBool, Ordering},
     sync::{Arc, Mutex},
-    process
 };
 
 use axum::{
@@ -29,10 +29,10 @@ use axum::{
     TypedHeader,
 };
 use clap::Parser;
-use serde::{Deserialize, Serialize};
 use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
 
-use ::autoban::{database, filer_service::service, server::server::start_server,config};
+use ::autoban::{config, database, filer_service::service, server::server::start_server};
 use ::iptables;
 use autoban::pause;
 use ctrlc;
@@ -58,7 +58,7 @@ struct Args {
 async fn main() {
     // initialize tracing
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::INFO)
         .init();
 
     let args = Args::parse();
@@ -80,7 +80,10 @@ async fn main() {
         eprintln!("✨ run in cloud mode, load config from env");
         config::from_env()
     } else {
-        eprintln!("✨ run in normal mode, load conf from local file `{}", &args.config);
+        eprintln!(
+            "✨ run in normal mode, load conf from local file `{}",
+            &args.config
+        );
         config::from_file(&args.config)
     } {
         log::debug!("{}", serde_json::to_string_pretty(&cfg).unwrap());
@@ -101,13 +104,9 @@ async fn main() {
     let data = Arc::new(Mutex::new(service::FilterService::new()));
 
     // let data = data.clone();
-    data
-        .lock()
-        .unwrap()
-        .load_config(&*config.lock().unwrap());
+    data.lock().unwrap().load_config(&*config.lock().unwrap());
 
     data.lock().unwrap().start();
-
 
     let mut handles = Vec::new();
 
@@ -121,8 +120,6 @@ async fn main() {
     }));
 
     // let data_clone = data.clone();
-
-
 
     // let tmp = f.clone();
     // handles.push(tokio::spawn(async move {
@@ -159,6 +156,5 @@ async fn main() {
     //         eprintln!("Unable to listen for shutdown signal: {}", err);
     //         // we also shut down in case of error
     //     }
-    // }    
-
+    // }
 }
