@@ -34,7 +34,7 @@ pub async fn add_whitelist(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 
@@ -91,7 +91,7 @@ pub async fn add_blacklist(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 
@@ -135,7 +135,7 @@ pub async fn list_whitelist(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
     database: axum::extract::Extension<Arc<Mutex<crate::database::query::Database>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
@@ -193,7 +193,7 @@ pub async fn remove_whitelist(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 
@@ -242,7 +242,7 @@ pub async fn remove_blacklist(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 
@@ -291,7 +291,7 @@ pub async fn list_blacklist(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 
@@ -332,7 +332,7 @@ pub async fn reset_whitelist(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 
@@ -363,7 +363,7 @@ pub async fn reset_all(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 
@@ -379,7 +379,7 @@ pub async fn reset_all(
         let mut data = data.0.lock().unwrap();
         log::info!("client: {query_ip} reset_whitelist");
         data.init();
-        data.load_config(config.lock().unwrap().clone());
+        data.load_config(&config.lock().unwrap().clone());
         data.reset_table();
 
         return (StatusCode::OK, "ok".to_string());
@@ -399,7 +399,7 @@ pub async fn get_record(
     xrealip: Result<TypedHeader<XRealIp>, TypedHeaderRejection>,
     xforwardfor: Result<TypedHeader<XForwardedFor>, TypedHeaderRejection>,
     data: axum::extract::Extension<Arc<Mutex<service::FilterService>>>,
-    config: axum::extract::Extension<Arc<Mutex<crate::Config>>>,
+    config: axum::extract::Extension<Arc<Mutex<crate::config::Config>>>,
 ) -> impl IntoResponse {
     println!("{}, {:?}, {:?}", method, addr, user_agent);
 

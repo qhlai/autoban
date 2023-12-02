@@ -1,4 +1,4 @@
-use crate::filer_service::*;
+use crate::{filer_service::*, config};
 use crate::utils::iferror::iferror;
 use ::iptables;
 use cidr_utils::cidr::IpCidr;
@@ -292,9 +292,9 @@ impl FilterService {
         iferror(self.tables_v4.flush_chain("filter", BANDWIDTH_OUT_CHAIN));
         iferror(self.tables_v4.delete_chain("filter", BANDWIDTH_OUT_CHAIN));
     }
-    pub fn load_config(&mut self, config: crate::Config) {
+    pub fn load_config(&mut self, config: & crate::config::Config) {
         // self.
-
+        let config = config.clone();
         for ip in config.filterlist.allow_ips.into_iter() {
             let ip = cidr_utils::cidr::IpCidr::from_str(&ip[..]).unwrap();
 

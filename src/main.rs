@@ -1,6 +1,17 @@
 // #![deny(warnings)]
 // #![allow(unused)]
-use autoban::pause;
+
+use std::{
+    collections::HashMap,
+    error::Error,
+    net::SocketAddr,
+    ops::Deref,
+    rc::Rc,
+    sync::atomic::{AtomicBool, Ordering},
+    sync::{Arc, Mutex},
+    process
+};
+
 use axum::{
     extract::{
         rejection::{QueryRejection, TypedHeaderRejection},
@@ -19,22 +30,29 @@ use axum::{
 };
 use clap::Parser;
 use serde::{Deserialize, Serialize};
+use once_cell::sync::OnceCell;
 
-use std::{
-    collections::HashMap,
-    error::Error,
-    net::SocketAddr,
-    ops::Deref,
-    rc::Rc,
-    sync::atomic::{AtomicBool, Ordering},
-    sync::{Arc, Mutex},
-};
-
-use ::autoban::{database, filer_service::service, server::server::start_server, Config};
+use ::autoban::{database, filer_service::service, server::server::start_server,config};
 use ::iptables;
+use autoban::pause;
 use ctrlc;
 use tokio::signal;
 use toml::Table;
+
+static G_CONFIG: OnceCell<config::Config> = OnceCell::new();
+// static G_STATS_MGR: OnceCell<crate::stats::StatsMgr> = OnceCell::new();
+#[derive(Parser, Debug)]
+#[command(author, version = env!("APP_VERSION"), about, long_about = None)]
+struct Args {
+    #[arg(short, long, default_value = "config.toml")]
+    config: String,
+    #[arg(short = 't', long, help = "config test, default:false")]
+    config_test: bool,
+    #[arg(long = "notify-test", help = "notify test, default:false")]
+    notify_test: bool,
+    #[arg(long = "cloud", help = "cloud mode, load cfg from env var: SRV_CONF")]
+    cloud: bool,
+}
 
 #[tokio::main]
 async fn main() {
@@ -42,54 +60,69 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .init();
-    let file_path = "./config.toml";
-    let config = std::fs::read_to_string(file_path).unwrap_or_else(|error| {
-        // 操作失败，处理错误值
-        log::error!("Error reading file: {}", error);
-        // 返回一个默认值
-        std::process::exit(1);
-    });
 
-    // let config: Config = toml::from_str(r#" "#).unwrap_or_else(|error| {
-    let config: Config = toml::from_str(&config[..]).unwrap_or_else(|error| {
-        // 操作失败，处理错误值
-        log::error!("Error reading file: {}", error);
-        // 返回一个默认值
-        std::process::exit(1);
-    });
-    let config = Arc::new(Mutex::new(config));
+    let args = Args::parse();
+
+    eprintln!("✨ {} {}", env!("CARGO_BIN_NAME"), env!("APP_VERSION"));
+
+    // config test
+    if args.config_test {
+        config::test_from_file(&args.config).unwrap();
+        eprintln!("✨ the conf file {} syntax is ok", &args.config);
+        eprintln!("✨ the conf file {} test is successful", &args.config);
+        std::process::exit(0);
+    }
+
+    // config load
+    if let Some(cfg) = if args.cloud {
+        // export SRV_CONF=$(cat config.toml)
+        // echo "$SRV_CONF"
+        eprintln!("✨ run in cloud mode, load config from env");
+        config::from_env()
+    } else {
+        eprintln!("✨ run in normal mode, load conf from local file `{}", &args.config);
+        config::from_file(&args.config)
+    } {
+        log::debug!("{}", serde_json::to_string_pretty(&cfg).unwrap());
+        G_CONFIG.set(cfg).unwrap();
+    } else {
+        log::error!("can't parse config");
+        process::exit(1);
+    }
+
+    let config = G_CONFIG.get().unwrap();
+
+    let config = Arc::new(Mutex::new(config.to_owned()));
 
     log::debug!("{:?}", config);
     let database = Arc::new(Mutex::new(database::query::Database::new()));
 
     // let running = Arc::new(AtomicBool::new(true));
-    let filter_config = Arc::new(Mutex::new(service::FilterService::new()));
+    let data = Arc::new(Mutex::new(service::FilterService::new()));
 
-    let filter_config = filter_config.clone();
-    filter_config
+    // let data = data.clone();
+    data
         .lock()
         .unwrap()
-        .load_config(config.lock().unwrap().clone());
-    filter_config.lock().unwrap().start();
+        .load_config(&*config.lock().unwrap());
+
+    data.lock().unwrap().start();
+
+
     let mut handles = Vec::new();
 
-    let filter_config_clone = filter_config.clone();
+    let data_clone = data.clone();
     // a.lock().unwrap().clear_tables();
+    // Arc<crate::config::Config>
+    // let config: Arc<crate::config::Config> = Arc::new(*config);
+    let config_clone = config.clone();
     handles.push(tokio::spawn(async move {
-        start_server(config, filter_config_clone, database).await;
+        start_server(config_clone, data_clone, database).await;
     }));
-    let filter_config_clone = filter_config.clone();
 
-    match signal::ctrl_c().await {
-        Ok(()) => {
-            filter_config_clone.lock().unwrap().clear_tables();
-            std::process::exit(0);
-        }
-        Err(err) => {
-            eprintln!("Unable to listen for shutdown signal: {}", err);
-            // we also shut down in case of error
-        }
-    }
+    // let data_clone = data.clone();
+
+
 
     // let tmp = f.clone();
     // handles.push(tokio::spawn(async move {
@@ -115,4 +148,17 @@ async fn main() {
     for handler in handles {
         handler.await.unwrap();
     }
+
+    // match signal::ctrl_c().await {
+    //     Ok(()) => {
+    //         // data_clone.lock().unwrap().clear_tables();
+    //         println!("signal received, starting graceful shutdown");
+    //         std::process::exit(0);
+    //     }
+    //     Err(err) => {
+    //         eprintln!("Unable to listen for shutdown signal: {}", err);
+    //         // we also shut down in case of error
+    //     }
+    // }    
+
 }

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="keywords" content="autoban" />
+    <meta name="description" content="autoban">
+    <meta name="author" content="elias">
+    <meta name="robots" content="noindex">
+    <link rel="apple-touch-icon" href="/logo192.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>AutoBan-Rust</title>
+    <!-- <script defer="defer" src="/static/js/main.94593fac.js"></script> -->
+    <!-- <link href="/static/css/main.06d33b8a.css" rel="stylesheet"> -->
+</head>
+
+<body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <!-- <div id="root"></div> -->
+    <input type="text" id="key">
+    <input type="text" id="ip">
+    <button type="button" onclick="fetchData('/api/add')">add</button>
+    <button type="button" onclick="fetchData('/api/remove')">remove</button>
+    <button type="button" onclick="fetchData('/api/list')">list</button>
+    <button type="button" onclick="fetchData('/api/ban')">ban</button>
+    <button type="button" onclick="fetchData('/api/unban')">unban</button>
+    <button type="button" onclick="fetchData('/api/listb')">listb</button>
+    <button type="button" onclick="fetchData('/api/listw')">listw</button>
+    <button type="button" onclick="fetchData('/api/reset')">reset</button>
+    <button type="button" onclick="fetchData('/api/log')">log</button>
+
+    <div id="responseContainer"></div>
+</body>
+
+
+<script>
+    var key=0;
+    function sendRequest(url) {
+      // 创建一个 XMLHttpRequest 对象
+      var xhr = new XMLHttpRequest();
+      var inputElement = document.getElementById("key");
+      var key = inputElement.value;
+      // 设置请求方法和 URL
+      xhr.open('GET', url+"?key="+key, true);
+
+      // 监听请求完成事件
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          // 请求成功处理
+          console.log('请求成功');
+        } else {
+          // 请求失败处理
+          console.log('请求失败');
+        }
+      };
+
+      // 发送请求
+      xhr.send();
+    }
+    function fetchData(url) {
+        var xhr = new XMLHttpRequest();
+
+        xhr.onreadystatechange = function() {
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+            if (xhr.status === 200) {
+            var responseContainer = document.getElementById('responseContainer');
+            responseContainer.textContent = xhr.responseText;
+            } else {
+            console.error('请求发生错误:', xhr.status);
+            }
+        }
+        };
+        var inputElement = document.getElementById("key");
+        var key = inputElement.value;
+        xhr.open('GET', url+"?key="+key); // 替换为你的后端 URL
+        xhr.send();
+    }
+
+    function redirectToURL(url) {
+      window.location.href = url;  // 替换为你想要跳转的 URL
+    }
+</script>
+
+</html>
